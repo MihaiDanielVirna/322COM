@@ -1,10 +1,54 @@
 #version 420 core
 
-smooth in vec4 colorsExport;
+in vec3 normalExport;
+in vec4 colorsExport;
+in vec2 texCoordsExport;
+
+uniform sampler2D grassTex;
 
 out vec4 colorsOut;
 
+vec4 fieldTexColor;
+struct Light
+{
+   vec4 ambCols;
+   vec4 difCols;
+   vec4 specCols;
+   vec4 coords;
+};
+uniform Light light0;
+
+uniform vec4 globAmb;
+  
+struct Material
+{
+   vec4 ambRefl;
+   vec4 difRefl;
+   vec4 specRefl;
+   vec4 emitCols;
+   float shininess;
+};
+uniform Material terrainFandB;
+
+vec3 normal, lightDirection, eyeDirection, halfway;
+vec4 fAndBEmit, fAndBGlobAmb, fAndBAmb, fAndBDif, fAndBSpec;
+
 void main(void)
 {
-   colorsOut = colorsExport;
+	normal = normalize(normalExport);
+   lightDirection = normalize(vec3(light0.coords));
+   eyeDirection = vec3(0.0, 0.0, 1.0);
+   halfway = (length(lightDirection + eyeDirection) == 0.0) ? 
+             vec3(0.0) : (lightDirection + eyeDirection)/length(lightDirection + eyeDirection);
+   
+   fAndBEmit = terrainFandB.emitCols;
+   fAndBGlobAmb = globAmb * terrainFandB.ambRefl;
+   fAndBAmb = light0.ambCols * terrainFandB.ambRefl;
+   fAndBDif = max(dot(normal, lightDirection), 0.0) * light0.difCols * terrainFandB.difRefl;    
+   fAndBSpec = pow(max(dot(normal, halfway), 0.0), terrainFandB.shininess) * 
+               light0.specCols * terrainFandB.specRefl;
+   vec4 finalColour =  vec4(vec3(min(fAndBEmit + fAndBGlobAmb + fAndBAmb + 
+                fAndBDif + fAndBSpec, vec4(1.0))), 1.0);  
+	fieldTexColor = texture(grassTex,texCoordsExport);
+   colorsOut = fieldTexColor * finalColour;
 }

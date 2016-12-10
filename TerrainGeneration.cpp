@@ -27,6 +27,7 @@ struct Vertex
 {
 	float coords[4];
 	vec3 normals;
+	vec2 texCoords;
 };
 
 struct Matrix4x4
@@ -46,6 +47,14 @@ static const Matrix4x4 IDENTITY_MATRIX4x4 =
 	}
 };
 
+struct BitMapFile
+{
+	int sizeX;
+	int sizeY;
+	unsigned char *data;
+};
+
+BitMapFile *getbmp(string filename);
 struct Material
 {
 	vec4 ambRefl;
@@ -75,7 +84,7 @@ static const Light light0 =
 	vec4(0.0, 0.0, 0.0, 1.0),
 	vec4(1.0, 1.0, 1.0, 1.0),
 	vec4(1.0, 1.0, 1.0, 1.0),
-	vec4(5.0, 5.0, 0.0, 0.0)
+	vec4(0.0, 5.0, 0.0, 0.0)
 };
 
 static enum buffer { TERRAIN_VERTICES };
@@ -99,7 +108,11 @@ modelViewMatLoc,
 normalMatLoc,
 projMatLoc,
 buffer[1],
-vao[1];
+vao[1],
+texture[1];
+
+static BitMapFile *image;
+
 void shaderCompileTest(GLuint shader)
 {
 	GLint result = GL_FALSE;
@@ -137,23 +150,33 @@ void setup(void)
 		for (int z = 0; z < MAP_SIZE; z++)
 		{
 			terrain[x][z] = 0;
-			if (z == 5 && x == 5) terrain[x][z] = 1;
+			if (z == 5 && x == 5) terrain[x][z] = 1.2;
 		}
 	}
-
+	terrain[4][5] = 1;
+	terrain[5][4] = 1;
+	terrain[5][6] = 1;
+	terrain[6][5] = 1;
 	// TODO: Add your code here to calculate the height values of the terrain using the Diamond square algorithm
 	
 
 	// Intialise vertex array
 	int i = 0;
-
+	float fTextureS = float(MAP_SIZE)*0.1f;
+	float fTextureT = float(MAP_SIZE)*0.1f;
 	for (int z = 0; z < MAP_SIZE; z++)
 	{
 		for (int x = 0; x < MAP_SIZE; x++)
 		{
 			// Set the coords (1st 4 elements) and a default colour of black (2nd 4 elements) 
-			terrainVertices[i] = { { (float)x, terrain[x][z], (float)z, 1.0 }, { 0.0, 1.0, 0.0} };
-			i++;
+			
+			float fScaleC = float(x) / float(MAP_SIZE - 1);
+			float fScaleR = float(z) / float(MAP_SIZE - 1);
+			vec2 tex = vec2(1);
+			tex.s = fScaleC*4.0f;
+			tex.t = fScaleR*4.0f;
+			terrainVertices[i] = { { (float)x, terrain[x][z], (float)z, 1.0 },{ 0.0, 1.0, 0.0 },tex };
+			i++;
 		}
 	}
 	//stackoverflow.com/questions/13983189/opengl-how-to-calculate-normals-in-a-terrain-height-grid 
@@ -236,6 +259,8 @@ void setup(void)
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(terrainVertices[0]), (GLvoid*)sizeof(terrainVertices[0].coords));
 	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(terrainVertices[0]), (GLvoid*)(sizeof(terrainVertices[0].coords)+sizeof(terrainVertices[0].normals)));
+	glEnableVertexAttribArray(2);
 	///////////////////////////////////////
 
 	// Obtain projection matrix uniform location and set value.
@@ -249,11 +274,10 @@ void setup(void)
 	mat4 modelViewMat = mat4(1.0);
 	// Move terrain into view - glm::translate replaces glTranslatef
 
-	modelViewMat = translate(modelViewMat, vec3(-2.5f, -2.5f, -10.0f)); // 5x5 grid
-	modelViewMat = translate(modelViewMat, vec3(-1.0f, -5.0f, -10.0f));
+	modelViewMat = translate(modelViewMat, vec3(-5.5f, -1.5f, -10.0f));
 	modelViewMatLoc = glGetUniformLocation(programId, "modelViewMat");
 	glUniformMatrix4fv(modelViewMatLoc, 1, GL_FALSE, value_ptr(modelViewMat));
-
+	
 	glUniform4fv(glGetUniformLocation(programId, "terrainFandB.ambRefl"), 1,
 		&terrainFandB.ambRefl[0]);
 	glUniform4fv(glGetUniformLocation(programId, "terrainFandB.difRefl"), 1,
@@ -278,7 +302,23 @@ void setup(void)
 		&light0.specCols[0]);
 	glUniform4fv(glGetUniformLocation(programId, "light0.coords"), 1,
 		&light0.coords[0]);
-	///////////////////////////////////////
+
+	image = getbmp("Textures/grass.bmp");
+	///////////////////////////////////////// Create texture ids.
+	glGenTextures(1, texture);
+
+	// Bind grass image.
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image->sizeX, image->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image->data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	int grassTexLoc = glGetUniformLocation(programId, "grassTex");
+	glUniform1i(grassTexLoc, 0);
 }
 
 // Drawing routine.
@@ -329,7 +369,7 @@ int main(int argc, char* argv[])
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA);
 	glutInitWindowSize(SCREEN_WIDTH, SCREEN_HEIGHT);
 	glutInitWindowPosition(100, 100);
-	glutCreateWindow("TerrainGeneration");
+	glutCreateWindow("Procedural Terrain");
 
 	// Set OpenGL to render in wireframe mode
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -346,4 +386,72 @@ int main(int argc, char* argv[])
 	setup();
 
 	glutMainLoop();
+}
+BitMapFile *getbmp(string filename)
+{
+	int offset, headerSize;
+
+	// Initialize bitmap files for RGB (input) and RGBA (output).
+	BitMapFile *bmpRGB = new BitMapFile;
+	BitMapFile *bmpRGBA = new BitMapFile;
+
+	// Read input bmp file name.
+	ifstream infile(filename.c_str(), ios::binary);
+
+	// Get starting point of image data in bmp file.
+	infile.seekg(10);
+	infile.read((char *)&offset, 4);
+
+	// Get header size of bmp file.
+	infile.read((char *)&headerSize, 4);
+
+	// Get image width and height values from bmp file header.
+	infile.seekg(18);
+	infile.read((char *)&bmpRGB->sizeX, 4);
+	infile.read((char *)&bmpRGB->sizeY, 4);
+
+	// Determine the length of zero-byte padding of the scanlines 
+	// (each scanline of a bmp file is 4-byte aligned by padding with zeros).
+	int padding = (3 * bmpRGB->sizeX) % 4 ? 4 - (3 * bmpRGB->sizeX) % 4 : 0;
+
+	// Add the padding to determine size of each scanline.
+	int sizeScanline = 3 * bmpRGB->sizeX + padding;
+
+	// Allocate storage for image in input bitmap file.
+	int sizeStorage = sizeScanline * bmpRGB->sizeY;
+	bmpRGB->data = new unsigned char[sizeStorage];
+
+	// Read bmp file image data into input bitmap file.
+	infile.seekg(offset);
+	infile.read((char *)bmpRGB->data, sizeStorage);
+
+	// Reverse color values from BGR (bmp storage format) to RGB.
+	int startScanline, endScanlineImageData, temp;
+	for (int y = 0; y < bmpRGB->sizeY; y++)
+	{
+		startScanline = y * sizeScanline; // Start position of y'th scanline.
+		endScanlineImageData = startScanline + 3 * bmpRGB->sizeX; // Image data excludes padding.
+		for (int x = startScanline; x < endScanlineImageData; x += 3)
+		{
+			temp = bmpRGB->data[x];
+			bmpRGB->data[x] = bmpRGB->data[x + 2];
+			bmpRGB->data[x + 2] = temp;
+		}
+	}
+
+	// Set image width and height values and allocate storage for image in output bitmap file.
+	bmpRGBA->sizeX = bmpRGB->sizeX;
+	bmpRGBA->sizeY = bmpRGB->sizeY;
+	bmpRGBA->data = new unsigned char[4 * bmpRGB->sizeX*bmpRGB->sizeY];
+
+	// Copy RGB data from input to output bitmap files, set output A to 1.
+	for (int j = 0; j < 4 * bmpRGB->sizeY * bmpRGB->sizeX; j += 4)
+	{
+		bmpRGBA->data[j] = bmpRGB->data[(j / 4) * 3];
+		bmpRGBA->data[j + 1] = bmpRGB->data[(j / 4) * 3 + 1];
+		bmpRGBA->data[j + 2] = bmpRGB->data[(j / 4) * 3 + 2];
+		bmpRGBA->data[j + 3] = 0xFF;
+	}
+
+	return bmpRGBA;
 }

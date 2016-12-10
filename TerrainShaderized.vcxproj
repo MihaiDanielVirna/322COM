@@ -53,7 +53,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>E:\freeglut\include\GL;C:\glm;E:\glew-2.0.0\include;C:\OpenGL\glm-0.9.6.3;C:\OpenGL\glew-1.10.0\include\;C:\OpenGL\freeglut-MSVC-2.8.1-1.mp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\freeglut\include\GL;E:\glm;E:\glew-2.0.0\include;C:\OpenGL\glm-0.9.6.3;C:\OpenGL\glew-1.10.0\include\;C:\OpenGL\freeglut-MSVC-2.8.1-1.mp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
